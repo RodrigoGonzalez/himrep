@@ -32,7 +32,7 @@ def load_model(model_file_name):
 	"""
 	model = liblinear.load_model(model_file_name.encode())
 	if not model: 
-		print("can't open model file %s" % model_file_name)
+		print(f"can't open model file {model_file_name}")
 		return None
 	model = toPyModel(model)
 	return model
@@ -127,18 +127,14 @@ def train(arg1, arg2=None, arg3=None):
 		param = parameter(options)
 	elif isinstance(arg1, problem):
 		prob = arg1
-		if isinstance(arg2, parameter):
-			param = arg2
-		else :
-			param = parameter(arg2)
-	if prob == None or param == None :
+		param = arg2 if isinstance(arg2, parameter) else parameter(arg2)
+	if prob is None or param is None:
 		raise TypeError("Wrong types for the arguments")
 
 	prob.set_bias(param.bias)
 	liblinear.set_print_string_function(param.print_func)
-	err_msg = liblinear.check_parameter(prob, param)
-	if err_msg :
-		raise ValueError('Error: %s' % err_msg)
+	if err_msg := liblinear.check_parameter(prob, param):
+		raise ValueError(f'Error: {err_msg}')
 
 	if param.cross_validation:
 		l, nr_fold = prob.l, param.nr_fold
@@ -185,11 +181,10 @@ def predict(y, x, m, options=""):
 	argv = options.split()
 	i = 0
 	while i < len(argv):
-		if argv[i] == '-b':
-			i += 1
-			predict_probability = int(argv[i])
-		else:
+		if argv[i] != '-b':
 			raise ValueError("Wrong options")
+		i += 1
+		predict_probability = int(argv[i])
 		i+=1
 
 	solver_type = m.param.solver_type
@@ -216,10 +211,7 @@ def predict(y, x, m, options=""):
 			pred_labels += [label]
 			pred_values += [values]
 	else:
-		if nr_class <= 2:
-			nr_classifier = 1
-		else:
-			nr_classifier = nr_class
+		nr_classifier = 1 if nr_class <= 2 else nr_class
 		dec_values = (c_double * nr_classifier)()
 		for xi in x:
 			xi, idx = gen_feature_nodearray(xi, feature_max=nr_feature)
@@ -231,11 +223,11 @@ def predict(y, x, m, options=""):
 	if len(y) == 0:
 		y = [0] * len(x)
 	ACC, MSE, SCC = evaluations(y, pred_labels)
-	l = len(y)
 	if solver_type in [L2R_L2LOSS_SVR, L2R_L2LOSS_SVR_DUAL, L2R_L1LOSS_SVR_DUAL]:
 		print("Mean squared error = %g (regression)" % MSE)
 		print("Squared correlation coefficient = %g (regression)" % SCC)
 	else:
+		l = len(y)
 		print("Accuracy = %g%% (%d/%d) (classification)" % (ACC, int(l*ACC/100), l))
 
 	return pred_labels, (ACC, MSE, SCC), pred_values
