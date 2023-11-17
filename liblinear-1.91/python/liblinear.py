@@ -10,13 +10,12 @@ if find_library('linear'):
 	liblinear = CDLL(find_library('linear'))
 elif find_library('liblinear'):
 	liblinear = CDLL(find_library('liblinear'))
+elif sys.platform == 'win32':
+	liblinear = CDLL(os.path.join(os.path.dirname(__file__),\
+			'../windows/liblinear.dll'))
 else:
-	if sys.platform == 'win32':
-		liblinear = CDLL(os.path.join(os.path.dirname(__file__),\
-				'../windows/liblinear.dll'))
-	else:
-		liblinear = CDLL(os.path.join(os.path.dirname(__file__),\
-				'../liblinear.so.1'))
+	liblinear = CDLL(os.path.join(os.path.dirname(__file__),\
+			'../liblinear.so.1'))
 
 # Construct constants
 SOLVER_TYPE = ['L2R_LR', 'L2R_L2LOSS_SVC_DUAL', 'L2R_L2LOSS_SVC', 'L2R_L1LOSS_SVC_DUAL',\
@@ -64,9 +63,7 @@ def gen_feature_nodearray(xi, feature_max=None, issparse=True):
 	for idx, j in enumerate(index_range):
 		ret[idx].index = j
 		ret[idx].value = xi[j]
-	max_idx = 0
-	if index_range : 
-		max_idx = index_range[-1]
+	max_idx = index_range[-1] if index_range else 0
 	return ret, max_idx
 
 class problem(Structure):
@@ -82,7 +79,7 @@ class problem(Structure):
 
 		max_idx = 0
 		x_space = self.x_space = []
-		for i, xi in enumerate(x):
+		for xi in x:
 			tmp_xi, tmp_idx = gen_feature_nodearray(xi)
 			x_space += [tmp_xi]
 			max_idx = max(max_idx, tmp_idx)
@@ -91,7 +88,7 @@ class problem(Structure):
 		self.y = (c_double * l)()
 		for i, yi in enumerate(y): self.y[i] = y[i]
 
-		self.x = (POINTER(feature_node) * l)() 
+		self.x = (POINTER(feature_node) * l)()
 		for i, xi in enumerate(self.x_space): self.x[i] = xi
 
 		self.set_bias(bias)
@@ -117,15 +114,15 @@ class parameter(Structure):
 	_fields_ = genFields(_names, _types)
 
 	def __init__(self, options = None):
-		if options == None:
+		if options is None:
 			options = ''
 		self.parse_options(options)
 
 	def show(self):
 		attrs = parameter._names + self.__dict__.keys()
-		values = map(lambda attr: getattr(self, attr), attrs) 
+		values = map(lambda attr: getattr(self, attr), attrs)
 		for attr, val in zip(attrs, values):
-			print(' %s: %s' % (attr, val))
+			print(f' {attr}: {val}')
 
 	def set_to_default_values(self):
 		self.solver_type = L2R_L2LOSS_SVC_DUAL
@@ -148,21 +145,21 @@ class parameter(Structure):
 		weight = []
 
 		i = 0
-		while i < len(argv) :
+		while i < len(argv):
 			if argv[i] == "-s":
-				i = i + 1
+				i += 1
 				self.solver_type = int(argv[i])
 			elif argv[i] == "-c":
-				i = i + 1
+				i += 1
 				self.C = float(argv[i])
 			elif argv[i] == "-p":
-				i = i + 1
+				i += 1
 				self.p = float(argv[i])
 			elif argv[i] == "-e":
-				i = i + 1
+				i += 1
 				self.eps = float(argv[i])
 			elif argv[i] == "-B":
-				i = i + 1
+				i += 1
 				self.bias = float(argv[i])
 			elif argv[i] == "-v":
 				i = i + 1
@@ -178,7 +175,7 @@ class parameter(Structure):
 				weight += [float(argv[i])]
 			elif argv[i] == "-q":
 				self.print_func = PRINT_STRING_FUN(print_null)
-			else :
+			else:
 				raise ValueError("Wrong options")
 			i += 1
 
@@ -235,7 +232,7 @@ def toPyModel(model_ptr):
 
 	Convert a ctypes POINTER(model) to a Python model
 	"""
-	if bool(model_ptr) == False:
+	if not bool(model_ptr):
 		raise ValueError("Null pointer")
 	m = model_ptr.contents
 	m.__createfrom__ = 'C'
